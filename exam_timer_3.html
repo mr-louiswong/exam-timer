@@ -212,11 +212,10 @@
 
             timerContent.innerHTML = `
                 <div class="flex items-center mb-2">
-                    <input type="text" class="timer-input flex-grow mr-2 bg-white dark:bg-gray-800"
+                    <input type="text" class="timer-input w-[230px] mr-2 bg-white dark:bg-gray-800"
                             placeholder="Subject Name" id="${timerId}-subject">
-                    <span class="mr-2 font-semibold whitespace-nowrap">Duration:</span>
-                    <input type="number" class="timer-input w-20"
-                            placeholder="mins" id="${timerId}-duration" min="1" value="5">
+                    <input type="number" class="timer-input w-16"
+                            placeholder="mins" id="${timerId}-duration" min="1" value="5"> <span class="ml-1">Mins</span>
                 </div>
 
                 <div class="text-center mb-2">
