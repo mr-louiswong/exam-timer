@@ -200,31 +200,30 @@
     </style>
 </head>
 <body class="bg-white dark:bg-[#181818] text-gray-900 dark:text-gray-100 min-h-screen">
-    <!-- Duration Modal Overlay -->
-    <div class="duration-modal-overlay" id="duration-modal-overlay">
-        <div class="duration-modal">
-            <h3 class="text-xl font-bold mb-4">Set Duration</h3>
-            <div class="flex items-center justify-center gap-2 mb-6">
-                <input type="number" min="0" class="duration-modal-input" id="hours-input" placeholder="0">
-                <span class="font-medium">H</span>
-                <input type="number" min="0" max="59" class="duration-modal-input" id="minutes-input" placeholder="0">
-                <span class="font-medium">M</span>
-            </div>
-            
-            <div class="flex justify-between mb-6">
-                <button class="multiplier-btn active bg-gray-200 dark:bg-gray-700" data-multiplier="1">Regular</button>
-                <button class="multiplier-btn bg-gray-200 dark:bg-gray-700" data-multiplier="1.25">25%</button>
-                <button class="multiplier-btn bg-gray-200 dark:bg-gray-700" data-multiplier="1.5">50%</button>
-            </div>
-            
-            <div class="flex justify-between">
-                <button class="timer-button bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600" id="cancel-duration">Cancel</button>
-                <button class="timer-button bg-primary text-white hover:bg-primary/90" id="confirm-duration">Confirm</button>
+    <div class="container mx-auto px-2 h-screen flex flex-col relative">
+        <!-- Duration Modal Overlay (moved inside container for fullscreen compatibility) -->
+        <div class="duration-modal-overlay" id="duration-modal-overlay">
+            <div class="duration-modal">
+                <h3 class="text-xl font-bold mb-4">Set Duration</h3>
+                <div class="flex items-center justify-center gap-2 mb-6">
+                    <input type="number" min="0" class="duration-modal-input" id="hours-input" placeholder="0">
+                    <span class="font-medium">H</span>
+                    <input type="number" min="0" max="59" class="duration-modal-input" id="minutes-input" placeholder="0">
+                    <span class="font-medium">M</span>
+                </div>
+                
+                <div class="flex justify-between mb-6">
+                    <button class="multiplier-btn active bg-gray-200 dark:bg-gray-700" data-multiplier="1">Regular</button>
+                    <button class="multiplier-btn bg-gray-200 dark:bg-gray-700" data-multiplier="1.25">25%</button>
+                    <button class="multiplier-btn bg-gray-200 dark:bg-gray-700" data-multiplier="1.5">50%</button>
+                </div>
+                
+                <div class="flex justify-between">
+                    <button class="timer-button bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600" id="cancel-duration">Cancel</button>
+                    <button class="timer-button bg-primary text-white hover:bg-primary/90" id="confirm-duration">Confirm</button>
+                </div>
             </div>
         </div>
-    </div>
-
-    <div class="container mx-auto px-2 h-screen flex flex-col relative">
         <button id="full-screen-button" title="Toggle Full Screen">
             <svg id="fullscreen-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
                 <path d="M3 3h7v3"></path>
