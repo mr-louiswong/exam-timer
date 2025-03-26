@@ -559,8 +559,8 @@
                             remainingSeconds: timerData.remainingSeconds,
                             startTime: timerData.startTime ? new Date(timerData.startTime) : null,
                             endTime: timerData.endTime ? new Date(timerData.endTime) : null,
-                            interval: null,
-                            lastUpdateTime: Date.now()
+                            pauseTime: null,
+                            interval: null
                         };
                         
                         // Set up event listeners
@@ -677,8 +677,13 @@
                 hoursInput.value = hours;
                 minutesInput.value = minutes;
                 
-                // Add visual feedback
-                presetBtns.forEach(b => b.classList.remove('bg-primary', 'text-white'));
+                // Reset all buttons to default style first
+                presetBtns.forEach(b => {
+                    b.classList.remove('bg-primary', 'text-white');
+                    b.classList.add('bg-gray-200', 'dark:bg-gray-700');
+                });
+                
+                // Then highlight the selected button
                 btn.classList.add('bg-primary', 'text-white');
                 btn.classList.remove('bg-gray-200', 'dark:bg-gray-700');
             });
@@ -803,8 +808,8 @@
                     remainingSeconds: 0,
                     startTime: null,
                     endTime: null,
-                    interval: null,
-                    lastUpdateTime: Date.now()
+                    pauseTime: null,
+                    interval: null
                 };
             }
 
@@ -893,16 +898,26 @@
             if (!timer.running) {
                 // Start the timer
                 const now = new Date();
+                
+                // If this is the first start (not a resume), set start and end times
                 if (!timer.startTime) {
                     timer.startTime = now;
-
-                    // Calculate end time
+                    
+                    // Calculate and store the exact end time
                     const endTime = new Date(now.getTime() + timer.remainingSeconds * 1000);
                     timer.endTime = endTime;
-
+                    
                     // Update time range display
                     updateTimeRange(timerId);
+                } else if (!timer.pauseTime) {
+                    // This is a resume after a pause, adjust the end time
+                    const pauseDuration = now.getTime() - timer.pauseTime.getTime();
+                    timer.endTime = new Date(timer.endTime.getTime() + pauseDuration);
+                    updateTimeRange(timerId);
                 }
+                
+                // Clear pauseTime on resume
+                timer.pauseTime = null;
 
                 // Lock duration input while timer is running
                 durationInput.disabled = true;
@@ -910,18 +925,12 @@
                 timer.running = true;
                 startButton.textContent = 'Pause';
 
-                // Store the exact timestamp when the timer was started/resumed
-                timer.lastUpdateTime = Date.now();
-
-                // Start countdown
+                // Start countdown with absolute time reference
                 timer.interval = setInterval(() => {
-                    // Calculate elapsed time since last update
-                    const now = Date.now();
-                    const elapsedSeconds = Math.floor((now - timer.lastUpdateTime) / 1000);
-                    timer.lastUpdateTime = now;
-                    
-                    // Decrease remaining time by actual elapsed seconds
-                    timer.remainingSeconds = Math.max(0, timer.remainingSeconds - elapsedSeconds);
+                    // Calculate remaining time based on current time and end time
+                    const currentTime = new Date();
+                    const remainingMs = Math.max(0, timer.endTime.getTime() - currentTime.getTime());
+                    timer.remainingSeconds = Math.ceil(remainingMs / 1000);
 
                     if (timer.remainingSeconds <= 0) {
                         // Timer finished
@@ -942,12 +951,11 @@
 
                     updateRemainingTime(timerId);
                     
-                    // Save to localStorage every 5 seconds to prevent data loss
-                    // but also save immediately when timer is about to finish
+                    // Save to localStorage periodically
                     if (timer.remainingSeconds % 5 === 0 || timer.remainingSeconds <= 10) {
                         saveTimersToLocalStorage();
                     }
-                }, 1000);
+                }, 100); // Update more frequently (every 100ms) for smoother countdown
 
                 // Save state to localStorage
                 saveTimersToLocalStorage();
@@ -956,6 +964,9 @@
                 // Pause the timer
                 clearInterval(timer.interval);
                 timer.running = false;
+                
+                // Store the pause time to adjust end time on resume
+                timer.pauseTime = new Date();
 
                 // Unlock duration input when timer is paused
                 durationInput.disabled = false;
