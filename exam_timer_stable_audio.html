@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Timer Display</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            overflow: hidden;
+            font-family: system-ui, -apple-system, sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .dark {
+            color-scheme: dark;
+        }
+
+        .timer-cell {
+            height: calc((100vh - 120px) / 2);
+            border: 3px dashed #ccc;
+            transition: all 0.3s ease;
+        }
+
+        .dark .timer-cell {
+            border-color: #555;
+        }
+
+        .timer-circle {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background-color: #f0f0f0;
+            margin: 0 auto;
+        }
+
+        .dark .timer-circle {
+            background-color: #333;
+        }
+
+        .timer-circle-fill {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            clip-path: circle(50% at center);
+            background: conic-gradient(#4ade80 var(--percentage, 100%), transparent 0);
+            transition: background 0.3s;
+        }
+
+        .timer-input {
+            font-size: 16px;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            background-color: white;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .dark .timer-input {
+            background-color: #333;
+            border-color: #555;
+            color: white;
+        }
+
+        .timer-button {
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .timer-button:active {
+            transform: scale(0.95);
+        }
+
+        /* For larger screens */
+        @media (min-width: 1280px) {
+            .timer-digits {
+                font-size: 4rem;
+            }
+        }
+
+        #full-screen-button {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            background-color: rgba(255, 255, 255, 0.7);
+            color: #333;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            z-index: 10;
+        }
+
+        #full-screen-button:hover {
+            background-color: rgba(255, 255, 255, 0.9);
+        }
+
+        .dark #full-screen-button {
+            background-color: rgba(0, 0, 0, 0.5);
+            color: #eee;
+        }
+
+        .dark #full-screen-button:hover {
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+
+        /* Duration Modal Styles */
+        .duration-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+
+        .duration-modal {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            width: 90%;
+            max-width: 400px;
+            margin-top: 80px;
+            transform: translateY(-20px);
+            transition: transform 0.3s;
+        }
+
+        .dark .duration-modal {
+            background-color: #333;
+            color: white;
+        }
+
+        .duration-modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .duration-modal-overlay.active .duration-modal {
+            transform: translateY(0);
+        }
+
+        .multiplier-btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .multiplier-btn.active {
+            background-color: #5D5CDE;
+            color: white;
+        }
+
+        .dark .multiplier-btn.active {
+            background-color: #5D5CDE;
+        }
+
+        .duration-modal-input {
+            font-size: 16px;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            background-color: white;
+            transition: all 0.3s;
+            text-align: center;
+            width: 70px;
+        }
+
+        .dark .duration-modal-input {
+            background-color: #444;
+            border-color: #555;
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-white dark:bg-[#181818] text-gray-900 dark:text-gray-100 min-h-screen">
+    <div class="container mx-auto px-2 h-screen flex flex-col relative">
+        <!-- Duration Modal Overlay (moved inside container for fullscreen compatibility) -->
+        <div class="duration-modal-overlay" id="duration-modal-overlay">
+            <div class="duration-modal">
+                <h3 class="text-xl font-bold mb-4">Set Duration</h3>
+                <div class="flex items-center justify-center gap-2 mb-4">
+                    <input type="number" min="0" class="duration-modal-input" id="hours-input" placeholder="0">
+                    <span class="font-medium">H</span>
+                    <input type="number" min="0" max="59" class="duration-modal-input" id="minutes-input" placeholder="0">
+                    <span class="font-medium">M</span>
+                </div>
+                
+                <!-- Preset duration buttons -->
+                <div class="mb-4">
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">Preset Durations:</p>
+                    <div class="grid grid-cols-4 gap-1 mb-1">
+                        <button class="preset-btn bg-gray-200 dark:bg-gray-700 text-xs p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600" data-hours="0" data-minutes="15">0 h 15 m</button>
+                        <button class="preset-btn bg-gray-200 dark:bg-gray-700 text-xs p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600" data-hours="0" data-minutes="30">0 h 30 m</button>
+                        <button class="preset-btn bg-gray-200 dark:bg-gray-700 text-xs p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600" data-hours="0" data-minutes="45">0 h 45 m</button>
+                        <button class="preset-btn bg-gray-200 dark:bg-gray-700 text-xs p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600" data-hours="1" data-minutes="0">1 h 0 m</button>
+                    </div>
+                    <div class="grid grid-cols-4 gap-1 mb-1">
+                        <button class="preset-btn bg-gray-200 dark:bg-gray-700 text-xs p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600" data-hours="1" data-minutes="15">1 h 15 m</button>
+                        <button class="preset-btn bg-gray-200 dark:bg-gray-700 text-xs p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600" data-hours="1" data-minutes="30">1 h 30 m</button>
+                        <button class="preset-btn bg-gray-200 dark:bg-gray-700 text-xs p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600" data-hours="1" data-minutes="45">1 h 45 m</button>
+                        <button class="preset-btn bg-gray-200 dark:bg-gray-700 text-xs p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600" data-hours="2" data-minutes="0">2 h 0 m</button>
+                    </div>
+                    <div class="grid grid-cols-4 gap-1">
+                        <button class="preset-btn bg-gray-200 dark:bg-gray-700 text-xs p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600" data-hours="2" data-minutes="15">2 h 15 m</button>
+                        <button class="preset-btn bg-gray-200 dark:bg-gray-700 text-xs p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600" data-hours="2" data-minutes="30">2 h 30 m</button>
+                        <button class="preset-btn bg-gray-200 dark:bg-gray-700 text-xs p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600" data-hours="2" data-minutes="45">2 h 45 m</button>
+                        <button class="preset-btn bg-gray-200 dark:bg-gray-700 text-xs p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600" data-hours="3" data-minutes="0">3 h 0 m</button>
+                    </div>
+                </div>
+                
+                <div class="flex justify-between mb-6">
+                    <button class="multiplier-btn active bg-gray-200 dark:bg-gray-700" data-multiplier="1">Regular</button>
+                    <button class="multiplier-btn bg-gray-200 dark:bg-gray-700" data-multiplier="1.25">25%</button>
+                    <button class="multiplier-btn bg-gray-200 dark:bg-gray-700" data-multiplier="1.5">50%</button>
+                </div>
+                
+                <div class="flex justify-between">
+                    <button class="timer-button bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600" id="cancel-duration">Cancel</button>
+                    <button class="timer-button bg-primary text-white hover:bg-primary/90" id="confirm-duration">Confirm</button>
+                </div>
+            </div>
+        </div>
+        <button id="full-screen-button" title="Toggle Full Screen">
+            <svg id="fullscreen-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
+                <path d="M3 3h7v3"></path>
+                <path d="M21 21h-7v-3"></path>
+                <path d="M21 3l-7 7"></path>
+                <path d="M3 21l7-7"></path>
+            </svg>
+        </button>
+        <button id="audio-announcement-button" title="Audio Announcements" class="absolute top-4 right-16 p-2 rounded-md bg-white/70 dark:bg-black/50 text-gray-800 dark:text-gray-200 cursor-pointer transition-colors hover:bg-white/90 dark:hover:bg-black/70 z-10">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+            </svg>
+        </button>
+        <button id="text-note-button" title="Add Text Note" class="absolute top-4 left-4 p-2 rounded-md bg-white/70 dark:bg-black/50 text-gray-800 dark:text-gray-200 cursor-pointer transition-colors hover:bg-white/90 dark:hover:bg-black/70 z-10">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+        </button>
+        <button id="about-button" title="About" class="absolute top-4 right-28 p-2 rounded-md bg-white/70 dark:bg-black/50 text-gray-800 dark:text-gray-200 cursor-pointer transition-colors hover:bg-white/90 dark:hover:bg-black/70 z-10">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+        </button>
+        <div class="flex justify-center items-center h-24">
+            <h1 class="text-5xl font-bold" id="current-time">00:00:00</h1>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4 flex-grow">
+            <div class="timer-cell flex justify-center items-center rounded-lg" id="timer-1">
+                <div class="plus-icon text-8xl text-gray-400 cursor-pointer hover:text-primary">+</div>
+            </div>
+            <div class="timer-cell flex justify-center items-center rounded-lg" id="timer-2">
+                <div class="plus-icon text-8xl text-gray-400 cursor-pointer hover:text-primary">+</div>
+            </div>
+            <div class="timer-cell flex justify-center items-center rounded-lg" id="timer-3">
+                <div class="plus-icon text-8xl text-gray-400 cursor-pointer hover:text-primary">+</div>
+            </div>
+
+            <div class="timer-cell flex justify-center items-center rounded-lg" id="timer-4">
+                <div class="plus-icon text-8xl text-gray-400 cursor-pointer hover:text-primary">+</div>
+            </div>
+            <div class="timer-cell flex justify-center items-center rounded-lg" id="timer-5">
+                <div class="plus-icon text-8xl text-gray-400 cursor-pointer hover:text-primary">+</div>
+            </div>
+            <div class="timer-cell flex justify-center items-center rounded-lg" id="timer-6">
+                <div class="plus-icon text-8xl text-gray-400 cursor-pointer hover:text-primary">+</div>
+            </div>
+        </div>
+
+        <!-- Audio Announcement Modal -->
+        <div class="fixed inset-0 bg-black/50 flex items-start justify-center pt-20 z-50 opacity-0 invisible transition-all duration-300" id="audio-modal">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md transform -translate-y-4 transition-transform duration-300" id="audio-modal-content">
+                <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                    <h3 class="text-lg font-semibold">Audio Announcements</h3>
+                    <button id="close-audio-modal" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-4">
+                    <table class="w-full border-collapse">
+                        <thead>
+                            <tr>
+                                <th class="border-b border-gray-200 dark:border-gray-700 pb-2 text-left">Unstructured</th>
+                                <th class="border-b border-gray-200 dark:border-gray-700 pb-2 text-left">Structured</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="py-2">
+                                    <button class="audio-btn bg-primary text-white py-2 px-4 rounded hover:bg-primary/90 w-full" data-audio="unstructured_30min">30 mins</button>
+                                </td>
+                                <td class="py-2">
+                                    <button class="audio-btn bg-primary text-white py-2 px-4 rounded hover:bg-primary/90 w-full" data-audio="structured_30min">30 mins</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="py-2">
+                                    <button class="audio-btn bg-primary text-white py-2 px-4 rounded hover:bg-primary/90 w-full" data-audio="unstructured_5min">5 mins</button>
+                                </td>
+                                <td class="py-2">
+                                    <button class="audio-btn bg-primary text-white py-2 px-4 rounded hover:bg-primary/90 w-full" data-audio="structured_5min">5 mins</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="py-2">
+                                    <button class="audio-btn bg-primary text-white py-2 px-4 rounded hover:bg-primary/90 w-full" data-audio="unstructured_end">End</button>
+                                </td>
+                                <td class="py-2">
+                                    <button class="audio-btn bg-primary text-white py-2 px-4 rounded hover:bg-primary/90 w-full" data-audio="structured_end">End</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                        <p>Currently playing: <span id="currently-playing">None</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Text display area (next to the icon) -->
+        <div id="text-note-display" class="absolute top-4 left-16 max-w-md p-2 bg-white/90 dark:bg-gray-800/90 rounded-md shadow-md text-gray-800 dark:text-gray-200 z-10 hidden"></div>
+        
+        <!-- Text Note Modal -->
+        <div class="fixed inset-0 bg-black/50 flex items-start justify-center pt-20 z-50 opacity-0 invisible transition-all duration-300" id="text-note-modal">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md transform -translate-y-4 transition-transform duration-300" id="text-note-modal-content">
+                <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                    <h3 class="text-lg font-semibold">Add Text Note</h3>
+                    <button id="close-text-note-modal" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-4">
+                    <textarea id="text-note-input" class="w-full h-32 p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200" placeholder="Enter your note here..."></textarea>
+                    <div class="flex justify-end mt-4 gap-2">
+                        <button id="cancel-text-note" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600">Cancel</button>
+                        <button id="confirm-text-note" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90">Confirm</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- About Modal -->
+        <div class="fixed inset-0 bg-black/50 flex items-start justify-center pt-20 z-50 opacity-0 invisible transition-all duration-300" id="about-modal">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md transform -translate-y-4 transition-transform duration-300" id="about-modal-content">
+                <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                    <h3 class="text-lg font-semibold">About This App</h3>
+                    <button id="close-about-modal" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-4">
+                    <div class="space-y-4">
+                        <div>
+                            <a href="https://github.com/mr-louiswong/exam-timer/" target="_blank" class="flex items-center gap-2 text-primary hover:underline">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+                                </svg>
+                                GitHub Repository
+                            </a>
+                        </div>
+                        <div>
+                            <a href="https://buymeacoffee.com/mrlouiswong" target="_blank" class="flex items-center gap-2 text-primary hover:underline">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+                                    <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
+                                    <line x1="6" y1="1" x2="6" y2="4"></line>
+                                    <line x1="10" y1="1" x2="10" y2="4"></line>
+                                    <line x1="14" y1="1" x2="14" y2="4"></line>
+                                </svg>
+                                Buy Me a Coffee
+                            </a>
+                        </div>
+                        <div>
+                            <a href="mailto:flipwithlouis@gmail.com?subject=Exam Timer Error Report" class="flex items-center gap-2 text-primary hover:underline">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                    <polyline points="22,6 12,13 2,6"></polyline>
+                                </svg>
+                                Report Error
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Handle dark mode detection
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+
+        // Current time display
+        function updateCurrentTime() {
+            const now = new Date();
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            const seconds = now.getSeconds().toString().padStart(2, '0');
+            document.getElementById('current-time').textContent = `${hours}:${minutes}:${seconds}`;
+        }
+
+        setInterval(updateCurrentTime, 1000);
+        updateCurrentTime();
+
+        // Local Storage Functions
+        function saveTimersToLocalStorage() {
+            const storageData = {};
+            
+            // For each timer, store its essential data
+            Object.keys(timers).forEach(timerId => {
+                const timer = timers[timerId];
+                // Check if the subject element exists (in case timer is being deleted)
+                const subjectElement = document.getElementById(`${timerId}-subject`);
+                const subject = subjectElement ? subjectElement.value || '' : '';
+                
+                storageData[timerId] = {
+                    duration: timer.duration,
+                    remainingSeconds: timer.remainingSeconds,
+                    running: timer.running,
+                    startTime: timer.startTime?.getTime(),
+                    endTime: timer.endTime?.getTime(),
+                    subject: subject,
+                    active: true // Flag to indicate this timer is active
+                };
+            });
+            
+            localStorage.setItem('examTimers', JSON.stringify(storageData));
+            console.log('Saved timers to localStorage:', storageData);
+        }
+        
+        function loadTimersFromLocalStorage() {
+            const savedData = localStorage.getItem('examTimers');
+            if (!savedData) {
+                console.log('No saved timers found in localStorage');
+                return;
+            }
+            
+            try {
+                console.log('Loading timers from localStorage');
+                const parsedData = JSON.parse(savedData);
+                
+                Object.keys(parsedData).forEach(timerId => {
+                    const timerData = parsedData[timerId];
+                    const timerCell = document.getElementById(timerId);
+                    
+                    if (!timerCell) {
+                        console.error(`Timer cell ${timerId} not found in DOM`);
+                        return;
+                    }
+                    
+                    // Only restore active timers
+                    if (!timerData.active) {
+                        return;
+                    }
+                    
+                    // Initialize the timer UI first
+                    const plusIcon = timerCell.querySelector('.plus-icon');
+                    if (plusIcon) {
+                        // Clear the cell first
+                        timerCell.innerHTML = '';
+                        
+                        // Create timer content
+                        const timerContent = document.createElement('div');
+                        timerContent.className = 'w-full h-full flex flex-col p-2';
+                        
+                        timerContent.innerHTML = `
+                            <div class="flex items-center mb-2">
+                                <input type="text" class="timer-input flex-grow mr-2 bg-white dark:bg-gray-800"
+                                        placeholder="Subject Name" id="${timerId}-subject">
+                                <input type="number" class="timer-input w-20 cursor-pointer"
+                                        placeholder="mins" id="${timerId}-duration" min="1" value="${timerData.duration}" readonly>
+                                <span class="ml-2 font-semibold whitespace-nowrap">Mins</span>
+                            </div>
+
+                            <div class="text-center mb-2">
+                                <span class="timer-digits text-5xl font-bold" id="${timerId}-remaining">
+                                    00:00:00
+                                </span>
+                            </div>
+
+                            <div class="flex justify-center items-center mb-2 gap-4">
+                                <div class="flex flex-col gap-2">
+                                    <button class="timer-button bg-black hover:bg-gray-800 text-white w-full" id="${timerId}-start">
+                                        Start
+                                    </button>
+                                    <button class="timer-button bg-black hover:bg-gray-800 text-white w-full" id="${timerId}-reset">
+                                        Reset
+                                    </button>
+                                    <button class="timer-button bg-black hover:bg-gray-800 text-white w-full" id="${timerId}-delete">
+                                        Delete
+                                    </button>
+                                </div>
+                                <div class="timer-circle">
+                                    <div class="timer-circle-fill" id="${timerId}-circle"></div>
+                                </div>
+                            </div>
+
+                            <div class="mt-2 text-lg font-medium text-center" id="${timerId}-time-range">
+                                Start: -- : -- - End: -- : --
+                            </div>
+                        `;
+                        
+                        timerCell.appendChild(timerContent);
+                        
+                        // Initialize timer data
+                        timers[timerId] = {
+                            running: false,
+                            duration: timerData.duration,
+                            remainingSeconds: timerData.remainingSeconds,
+                            startTime: timerData.startTime ? new Date(timerData.startTime) : null,
+                            endTime: timerData.endTime ? new Date(timerData.endTime) : null,
+                            interval: null,
+                            lastUpdateTime: Date.now()
+                        };
+                        
+                        // Set up event listeners
+                        document.getElementById(`${timerId}-start`).addEventListener('click', () => {
+                            toggleTimer(timerId);
+                        });
+
+                        document.getElementById(`${timerId}-reset`).addEventListener('click', () => {
+                            resetTimer(timerId);
+                        });
+
+                        document.getElementById(`${timerId}-delete`).addEventListener('click', () => {
+                            deleteTimer(timerId);
+                        });
+                        
+                        // Set up subject field to save on change
+                        const subjectInput = document.getElementById(`${timerId}-subject`);
+                        if (subjectInput) {
+                            subjectInput.value = timerData.subject || '';
+                            subjectInput.addEventListener('change', () => {
+                                saveTimersToLocalStorage();
+                            });
+                            subjectInput.addEventListener('blur', () => {
+                                saveTimersToLocalStorage();
+                            });
+                        }
+                        
+                        // Add click handler for duration input to show modal
+                        const durationInput = document.getElementById(`${timerId}-duration`);
+                        if (durationInput) {
+                            durationInput.addEventListener('click', () => {
+                                if (!timers[timerId].running) {
+                                    // Set the current duration input for the modal
+                                    currentDurationInput = durationInput;
+                                    
+                                    // Convert current minutes to hours and minutes
+                                    const currentMinutes = parseInt(durationInput.value) || 5;
+                                    const hours = Math.floor(currentMinutes / 60);
+                                    const minutes = currentMinutes % 60;
+                                    
+                                    // Update modal inputs
+                                    hoursInput.value = hours;
+                                    minutesInput.value = minutes;
+                                    
+                                    // Reset multiplier to Regular (1x)
+                                    multiplierBtns.forEach(btn => {
+                                        if (btn.dataset.multiplier === "1") {
+                                            btn.classList.add('active');
+                                        } else {
+                                            btn.classList.remove('active');
+                                        }
+                                    });
+                                    currentMultiplier = 1;
+                                    
+                                    // Show modal
+                                    durationModal.classList.add('active');
+                                }
+                            });
+                            
+                            // Set up change event for duration
+                            durationInput.addEventListener('change', () => {
+                                updateDuration(timerId);
+                            });
+                        }
+                        
+                        // Update UI
+                        updateRemainingTime(timerId);
+                        updateTimeRange(timerId);
+                        
+                        // If timer has finished, show it
+                        if (timerData.remainingSeconds <= 0) {
+                            const startButton = document.getElementById(`${timerId}-start`);
+                            if (startButton) {
+                                startButton.disabled = true;
+                                startButton.classList.add('opacity-50');
+                            }
+                            timerCell.classList.add('bg-red-100', 'dark:bg-red-900/30');
+                        }
+                        
+                        // If timer was running, restart it
+                        if (timerData.running) {
+                            toggleTimer(timerId);
+                        }
+                    }
+                });
+                
+                console.log('Successfully loaded timers from localStorage');
+                
+            } catch (error) {
+                console.error('Error loading saved timers:', error);
+                // Don't remove data on error, just log it
+            }
+        }
+
+        // Duration Modal Functionality
+        const durationModal = document.getElementById('duration-modal-overlay');
+        const hoursInput = document.getElementById('hours-input');
+        const minutesInput = document.getElementById('minutes-input');
+        const confirmDurationBtn = document.getElementById('confirm-duration');
+        const cancelDurationBtn = document.getElementById('cancel-duration');
+        const multiplierBtns = document.querySelectorAll('.multiplier-btn');
+        const presetBtns = document.querySelectorAll('.preset-btn');
+        
+        let currentMultiplier = 1;
+        let currentDurationInput = null;
+
+        // Set up preset duration buttons
+        presetBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const hours = parseInt(btn.dataset.hours);
+                const minutes = parseInt(btn.dataset.minutes);
+                
+                // Update the input fields
+                hoursInput.value = hours;
+                minutesInput.value = minutes;
+                
+                // Add visual feedback
+                presetBtns.forEach(b => b.classList.remove('bg-primary', 'text-white'));
+                btn.classList.add('bg-primary', 'text-white');
+                btn.classList.remove('bg-gray-200', 'dark:bg-gray-700');
+            });
+        });
+
+        // Set up multiplier buttons
+        multiplierBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Remove active class from all buttons
+                multiplierBtns.forEach(b => b.classList.remove('active'));
+                
+                // Add active class to clicked button
+                btn.classList.add('active');
+                
+                // Set current multiplier
+                currentMultiplier = parseFloat(btn.dataset.multiplier);
+            });
+        });
+
+        // Handle Cancel button
+        cancelDurationBtn.addEventListener('click', () => {
+            durationModal.classList.remove('active');
+        });
+
+        // Close modal when clicking outside
+        durationModal.addEventListener('click', (e) => {
+            if (e.target === durationModal) {
+                durationModal.classList.remove('active');
+            }
+        });
+
+        // Handle Confirm button
+        confirmDurationBtn.addEventListener('click', () => {
+            if (currentDurationInput) {
+                const hours = parseInt(hoursInput.value) || 0;
+                const minutes = parseInt(minutesInput.value) || 0;
+                
+                // Calculate total minutes with multiplier
+                let totalMinutes = Math.round((hours * 60 + minutes) * currentMultiplier);
+                
+                // Ensure we have at least 1 minute
+                totalMinutes = Math.max(1, totalMinutes);
+                
+                // Update the original duration input
+                currentDurationInput.value = totalMinutes;
+                
+                // Trigger change event to update the timer
+                const event = new Event('change');
+                currentDurationInput.dispatchEvent(event);
+            }
+            
+            durationModal.classList.remove('active');
+        });
+
+        // Timers functionality
+        const timerCells = document.querySelectorAll('.timer-cell');
+        const timers = {};
+
+        timerCells.forEach(cell => {
+            const plusIcon = cell.querySelector('.plus-icon');
+            const timerId = cell.id;
+
+            plusIcon.addEventListener('click', () => {
+                initializeTimer(timerId);
+            });
+        });
+
+        function initializeTimer(timerId, resetData = true) {
+            const timerCell = document.getElementById(timerId);
+
+            // Remove plus icon
+            timerCell.innerHTML = '';
+
+            // Create initialized timer UI
+            const timerContent = document.createElement('div');
+            timerContent.className = 'w-full h-full flex flex-col p-2';
+
+            timerContent.innerHTML = `
+                <div class="flex items-center mb-2">
+                    <input type="text" class="timer-input flex-grow mr-2 bg-white dark:bg-gray-800"
+                            placeholder="Subject Name" id="${timerId}-subject">
+                    <input type="number" class="timer-input w-20 cursor-pointer"
+                            placeholder="mins" id="${timerId}-duration" min="1" value="5" readonly>
+                    <span class="ml-2 font-semibold whitespace-nowrap">Mins</span>
+                </div>
+
+                <div class="text-center mb-2">
+                    <span class="timer-digits text-5xl font-bold" id="${timerId}-remaining">
+                        00:00:00
+                    </span>
+                </div>
+
+                <div class="flex justify-center items-center mb-2 gap-4">
+                    <div class="flex flex-col gap-2">
+                        <button class="timer-button bg-black hover:bg-gray-800 text-white w-full" id="${timerId}-start">
+                            Start
+                        </button>
+                        <button class="timer-button bg-black hover:bg-gray-800 text-white w-full" id="${timerId}-reset">
+                            Reset
+                        </button>
+                        <button class="timer-button bg-black hover:bg-gray-800 text-white w-full" id="${timerId}-delete">
+                            Delete
+                        </button>
+                    </div>
+                    <div class="timer-circle">
+                        <div class="timer-circle-fill" id="${timerId}-circle"></div>
+                    </div>
+                </div>
+
+                <div class="mt-2 text-lg font-medium text-center" id="${timerId}-time-range">
+                    Start: -- : -- - End: -- : --
+                </div>
+            `;
+
+            timerCell.appendChild(timerContent);
+
+            // Initialize timer data if this is a new timer
+            if (resetData) {
+                timers[timerId] = {
+                    running: false,
+                    duration: 0,
+                    remainingSeconds: 0,
+                    startTime: null,
+                    endTime: null,
+                    interval: null,
+                    lastUpdateTime: Date.now()
+                };
+            }
+
+            // Set up event listeners
+            document.getElementById(`${timerId}-start`).addEventListener('click', () => {
+                toggleTimer(timerId);
+            });
+
+            document.getElementById(`${timerId}-reset`).addEventListener('click', () => {
+                resetTimer(timerId);
+            });
+
+            document.getElementById(`${timerId}-delete`).addEventListener('click', () => {
+                deleteTimer(timerId);
+            });
+
+            // Set up subject field to save on change
+            const subjectInput = document.getElementById(`${timerId}-subject`);
+            subjectInput.addEventListener('change', () => {
+                saveTimersToLocalStorage();
+            });
+            subjectInput.addEventListener('blur', () => {
+                saveTimersToLocalStorage();
+            });
+
+            // Add click handler for duration input to show modal
+            const durationInput = document.getElementById(`${timerId}-duration`);
+            durationInput.addEventListener('click', () => {
+                if (!timers[timerId].running) {
+                    // Set the current duration input for the modal
+                    currentDurationInput = durationInput;
+                    
+                    // Convert current minutes to hours and minutes
+                    const currentMinutes = parseInt(durationInput.value) || 5;
+                    const hours = Math.floor(currentMinutes / 60);
+                    const minutes = currentMinutes % 60;
+                    
+                    // Update modal inputs
+                    hoursInput.value = hours;
+                    minutesInput.value = minutes;
+                    
+                    // Reset multiplier to Regular (1x)
+                    multiplierBtns.forEach(btn => {
+                        if (btn.dataset.multiplier === "1") {
+                            btn.classList.add('active');
+                        } else {
+                            btn.classList.remove('active');
+                        }
+                    });
+                    currentMultiplier = 1;
+                    
+                    // Show modal
+                    durationModal.classList.add('active');
+                }
+            });
+
+            // Set up change event for duration
+            durationInput.addEventListener('change', () => {
+                updateDuration(timerId);
+            });
+
+            // Set initial duration if this is a new timer
+            if (resetData) {
+                updateDuration(timerId);
+            }
+
+            // Save to localStorage
+            if (resetData) {
+                saveTimersToLocalStorage();
+            }
+        }
+
+        function updateDuration(timerId) {
+            const duration = parseInt(document.getElementById(`${timerId}-duration`).value) || 5;
+            timers[timerId].duration = duration;
+            timers[timerId].remainingSeconds = duration * 60;
+            updateRemainingTime(timerId);
+            saveTimersToLocalStorage();
+        }
+
+        function toggleTimer(timerId) {
+            const timer = timers[timerId];
+            const startButton = document.getElementById(`${timerId}-start`);
+            const durationInput = document.getElementById(`${timerId}-duration`);
+
+            if (!timer.running) {
+                // Start the timer
+                const now = new Date();
+                if (!timer.startTime) {
+                    timer.startTime = now;
+
+                    // Calculate end time
+                    const endTime = new Date(now.getTime() + timer.remainingSeconds * 1000);
+                    timer.endTime = endTime;
+
+                    // Update time range display
+                    updateTimeRange(timerId);
+                }
+
+                // Lock duration input while timer is running
+                durationInput.disabled = true;
+
+                timer.running = true;
+                startButton.textContent = 'Pause';
+
+                // Store the exact timestamp when the timer was started/resumed
+                timer.lastUpdateTime = Date.now();
+
+                // Start countdown
+                timer.interval = setInterval(() => {
+                    // Calculate elapsed time since last update
+                    const now = Date.now();
+                    const elapsedSeconds = Math.floor((now - timer.lastUpdateTime) / 1000);
+                    timer.lastUpdateTime = now;
+                    
+                    // Decrease remaining time by actual elapsed seconds
+                    timer.remainingSeconds = Math.max(0, timer.remainingSeconds - elapsedSeconds);
+
+                    if (timer.remainingSeconds <= 0) {
+                        // Timer finished
+                        clearInterval(timer.interval);
+                        timer.remainingSeconds = 0;
+                        timer.running = false;
+                        startButton.disabled = true;
+                        startButton.classList.add('opacity-50');
+
+                        // Visual alert for finished timer
+                        const timerCell = document.getElementById(timerId);
+                        timerCell.classList.add('bg-red-100', 'dark:bg-red-900/30');
+
+                        // Optionally, play a sound
+                        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBmDC/PCrThvs2dnasUQTX+L5/7hHDqvh9ve5Sg6b4fb8uUoOm+H2/LlKDpvh9vy5Sg6b4fb8uUoOm+H2/LlKDpvh9vy5Sg6b4fb8uUoOm+H2/LlKDpvh9vy5Sg6b4fb8uUoOm+H2/LlKDpvh9vy5Sg6b4fb8uUoOm+L5/7hHDqvh9ve5Sg6b4fb8uUoOm+Dc2tq5RBJf4vb6tEocIazu7/yuVB1JjqCs/PXgY0EiAAAAA==');
+                        audio.play().catch(err => console.log('Audio play failed:', err));
+                    }
+
+                    updateRemainingTime(timerId);
+                    
+                    // Save to localStorage every 5 seconds to prevent data loss
+                    // but also save immediately when timer is about to finish
+                    if (timer.remainingSeconds % 5 === 0 || timer.remainingSeconds <= 10) {
+                        saveTimersToLocalStorage();
+                    }
+                }, 1000);
+
+                // Save state to localStorage
+                saveTimersToLocalStorage();
+
+            } else {
+                // Pause the timer
+                clearInterval(timer.interval);
+                timer.running = false;
+
+                // Unlock duration input when timer is paused
+                durationInput.disabled = false;
+
+                startButton.textContent = 'Start';
+
+                // Save state to localStorage immediately when paused
+                saveTimersToLocalStorage();
+            }
+        }
+
+        function resetTimer(timerId) {
+            const timer = timers[timerId];
+            const startButton = document.getElementById(`${timerId}-start`);
+            const durationInput = document.getElementById(`${timerId}-duration`);
+
+            // Stop the timer if it's running
+            if (timer.running) {
+                clearInterval(timer.interval);
+                timer.running = false;
+            }
+
+            // Reset timer data
+            timer.remainingSeconds = timer.duration * 60;
+            timer.startTime = null;
+            timer.endTime = null;
+
+            // Update UI
+            startButton.textContent = 'Start';
+            startButton.disabled = false;
+            durationInput.disabled = false;
+            durationInput.readOnly = true;  // Keep it readonly but not disabled
+
+            document.getElementById(`${timerId}-time-range`).textContent = 'Start: -- : -- - End: -- : --';
+            document.getElementById(timerId).classList.remove('bg-red-100', 'dark:bg-red-900/30');
+
+            updateRemainingTime(timerId);
+
+            // Save state to localStorage
+            saveTimersToLocalStorage();
+        }
+
+        function deleteTimer(timerId) {
+            const timerCell = document.getElementById(timerId);
+
+            // Clear any running interval
+            if (timers[timerId] && timers[timerId].interval) {
+                clearInterval(timers[timerId].interval);
+            }
+
+            // Delete timer data
+            delete timers[timerId];
+
+            // Reset cell to initial state
+            timerCell.innerHTML = '<div class="plus-icon text-8xl text-gray-400 cursor-pointer hover:text-primary">+</div>';
+            timerCell.classList.remove('bg-red-100', 'dark:bg-red-900/30');
+
+            // Re-add event listener
+            const plusIcon = timerCell.querySelector('.plus-icon');
+            plusIcon.addEventListener('click', () => {
+                initializeTimer(timerId);
+            });
+
+            // Delete from localStorage
+            saveTimersToLocalStorage();
+        }
+
+        function updateRemainingTime(timerId) {
+            const remainingSeconds = timers[timerId].remainingSeconds;
+            const hours = Math.floor(remainingSeconds / 3600).toString().padStart(2, '0');
+            const minutes = Math.floor((remainingSeconds % 3600) / 60).toString().padStart(2, '0');
+            const seconds = (remainingSeconds % 60).toString().padStart(2, '0');
+
+            // Update digital display
+            document.getElementById(`${timerId}-remaining`).textContent = `${hours}:${minutes}:${seconds}`;
+
+            // Update circle fill
+            const totalSeconds = timers[timerId].duration * 60;
+            const percentage = (remainingSeconds / totalSeconds) * 100;
+            const circleFill = document.getElementById(`${timerId}-circle`);
+            circleFill.style.setProperty('--percentage', `${percentage}%`);
+
+            // Add color indication based on remaining time
+            if (percentage <= 25) {
+                circleFill.style.background = 'conic-gradient(#f43f5e var(--percentage), transparent 0)'; // A more subtle red
+            } else if (percentage <= 50) {
+                circleFill.style.background = 'conic-gradient(#f97316 var(--percentage), transparent 0)'; // A more subtle orange
+            } else {
+                circleFill.style.background = 'conic-gradient(#4ade80 var(--percentage), transparent 0)';
+            }
+        }
+
+        function updateTimeRange(timerId) {
+            const timer = timers[timerId];
+
+            if (timer.startTime && timer.endTime) {
+                const formatTime = (date) => {
+                    return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                };
+
+                const startTimeStr = formatTime(timer.startTime);
+                const endTimeStr = formatTime(timer.endTime);
+
+                document.getElementById(`${timerId}-time-range`).textContent = `Start: ${startTimeStr} - End: ${endTimeStr}`;
+            }
+        }
+
+        // Load saved timers and note on page load
+        window.onload = function() {
+            console.log('Window loaded, loading saved timers and note');
+            // Small delay to ensure DOM is fully ready
+            setTimeout(() => {
+                loadTimersFromLocalStorage();
+                loadSavedNote();
+            }, 100);
+        };
+
+        // Restore fullscreen functionality
+        const fullScreenButton = document.getElementById('full-screen-button');
+        const container = document.querySelector('.container');
+
+        fullScreenButton.addEventListener('click', () => {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+                fullScreenButton.querySelector('svg').innerHTML = `<path d="M3 3h7v3"></path><path d="M21 21h-7v-3"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path>`;
+            } else {
+                container.requestFullscreen().then(() => {
+                    fullScreenButton.querySelector('svg').innerHTML = `<path d="M5 16h3v3"></path><path d="M8 8v-3H5"></path><path d="M16 8h3V5"></path><path d="M19 16v3h-3"></path>`;
+                }).catch(err => {
+                    console.log(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                });
+            }
+        });
+
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                fullScreenButton.setAttribute('title', 'Exit Full Screen');
+            } else {
+                fullScreenButton.setAttribute('title', 'Toggle Full Screen');
+            }
+        });
+
+        // Audio announcement functionality
+        const audioButton = document.getElementById('audio-announcement-button');
+        const audioModal = document.getElementById('audio-modal');
+        const audioModalContent = document.getElementById('audio-modal-content');
+        const closeAudioModal = document.getElementById('close-audio-modal');
+        const currentlyPlaying = document.getElementById('currently-playing');
+        const audioBtns = document.querySelectorAll('.audio-btn');
+        
+        // Audio files mapping - Using GitHub raw URLs
+        const audioFiles = {
+            'unstructured_30min': 'https://raw.githubusercontent.com/mr-louiswong/exam-timer/main/audio/30.mp3',
+            'structured_30min': 'https://raw.githubusercontent.com/mr-louiswong/exam-timer/main/audio/30.mp3',
+            'unstructured_5min': 'https://raw.githubusercontent.com/mr-louiswong/exam-timer/main/audio/unstructured%205.mp3',
+            'structured_5min': 'https://raw.githubusercontent.com/mr-louiswong/exam-timer/main/audio/structured%205.mp3',
+            'unstructured_end': 'https://raw.githubusercontent.com/mr-louiswong/exam-timer/main/audio/unstructure%20end.mp3',
+            'structured_end': 'https://raw.githubusercontent.com/mr-louiswong/exam-timer/main/audio/structured%20end.mp3'
+        };
+        
+        let currentAudio = null;
+        
+        // Open audio modal
+        audioButton.addEventListener('click', () => {
+            audioModal.classList.remove('invisible', 'opacity-0');
+            audioModalContent.classList.remove('-translate-y-4');
+        });
+        
+        // Close audio modal
+        closeAudioModal.addEventListener('click', () => {
+            audioModal.classList.add('invisible', 'opacity-0');
+            audioModalContent.classList.add('-translate-y-4');
+        });
+        
+        // Close modal when clicking outside
+        audioModal.addEventListener('click', (e) => {
+            if (e.target === audioModal) {
+                audioModal.classList.add('invisible', 'opacity-0');
+                audioModalContent.classList.add('-translate-y-4');
+            }
+        });
+        
+        // Handle audio button clicks with better error handling
+        audioBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const audioKey = btn.dataset.audio;
+                const audioUrl = audioFiles[audioKey];
+                
+                // Stop any currently playing audio
+                if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio = null;
+                    currentlyPlaying.textContent = 'None';
+                }
+                
+                // Play the selected audio
+                currentAudio = new Audio(audioUrl);
+                
+                // Add error handling
+                currentAudio.addEventListener('error', (e) => {
+                    console.error('Audio error:', e);
+                    currentlyPlaying.textContent = 'Error: Could not play audio file';
+                    currentlyPlaying.classList.add('text-red-500');
+                    
+                    // Show more detailed message
+                    const errorDetails = document.createElement('div');
+                    errorDetails.className = 'mt-2 text-xs';
+                    errorDetails.textContent = 'Google Drive links may not work directly. Consider downloading the files and using local audio.';
+                    currentlyPlaying.parentNode.appendChild(errorDetails);
+                });
+                
+                currentAudio.addEventListener('ended', () => {
+                    currentlyPlaying.textContent = 'None';
+                    currentlyPlaying.classList.remove('text-red-500');
+                    currentAudio = null;
+                });
+                
+                currentAudio.play().then(() => {
+                    currentlyPlaying.textContent = btn.textContent + ' (' + (audioKey.includes('unstructured') ? 'Unstructured' : 'Structured') + ')';
+                    currentlyPlaying.classList.remove('text-red-500');
+                }).catch(err => {
+                    console.error('Error playing audio:', err);
+                    currentlyPlaying.textContent = 'Error: Could not play audio file';
+                    currentlyPlaying.classList.add('text-red-500');
+                });
+            });
+        });
+
+        // Text Note Functionality
+        const textNoteButton = document.getElementById('text-note-button');
+        const textNoteModal = document.getElementById('text-note-modal');
+        const textNoteModalContent = document.getElementById('text-note-modal-content');
+        const closeTextNoteModal = document.getElementById('close-text-note-modal');
+        const textNoteInput = document.getElementById('text-note-input');
+        const confirmTextNote = document.getElementById('confirm-text-note');
+        const cancelTextNote = document.getElementById('cancel-text-note');
+        const textNoteDisplay = document.getElementById('text-note-display');
+        
+        // Open text note modal
+        textNoteButton.addEventListener('click', () => {
+            // Load existing note from localStorage if available
+            const savedNote = localStorage.getItem('examTimerNote');
+            if (savedNote) {
+                textNoteInput.value = savedNote;
+            }
+            
+            textNoteModal.classList.remove('invisible', 'opacity-0');
+            textNoteModalContent.classList.remove('-translate-y-4');
+        });
+        
+        // Close text note modal
+        closeTextNoteModal.addEventListener('click', () => {
+            textNoteModal.classList.add('invisible', 'opacity-0');
+            textNoteModalContent.classList.add('-translate-y-4');
+        });
+        
+        // Cancel button
+        cancelTextNote.addEventListener('click', () => {
+            textNoteModal.classList.add('invisible', 'opacity-0');
+            textNoteModalContent.classList.add('-translate-y-4');
+        });
+        
+        // Confirm button
+        confirmTextNote.addEventListener('click', () => {
+            const noteText = textNoteInput.value.trim();
+            
+            if (noteText) {
+                // Save to localStorage
+                localStorage.setItem('examTimerNote', noteText);
+                
+                // Display the note
+                textNoteDisplay.textContent = noteText;
+                textNoteDisplay.classList.remove('hidden');
+            } else {
+                // If empty, clear the note
+                localStorage.removeItem('examTimerNote');
+                textNoteDisplay.textContent = '';
+                textNoteDisplay.classList.add('hidden');
+            }
+            
+            textNoteModal.classList.add('invisible', 'opacity-0');
+            textNoteModalContent.classList.add('-translate-y-4');
+        });
+        
+        // Close modal when clicking outside
+        textNoteModal.addEventListener('click', (e) => {
+            if (e.target === textNoteModal) {
+                textNoteModal.classList.add('invisible', 'opacity-0');
+                textNoteModalContent.classList.add('-translate-y-4');
+            }
+        });
+        
+        // Load saved note on page load
+        function loadSavedNote() {
+            const savedNote = localStorage.getItem('examTimerNote');
+            if (savedNote) {
+                textNoteDisplay.textContent = savedNote;
+                textNoteDisplay.classList.remove('hidden');
+            }
+        }
+        
+        // About Modal Functionality
+        const aboutButton = document.getElementById('about-button');
+        const aboutModal = document.getElementById('about-modal');
+        const aboutModalContent = document.getElementById('about-modal-content');
+        const closeAboutModal = document.getElementById('close-about-modal');
+        
+        // Open about modal
+        aboutButton.addEventListener('click', () => {
+            aboutModal.classList.remove('invisible', 'opacity-0');
+            aboutModalContent.classList.remove('-translate-y-4');
+        });
+        
+        // Close about modal
+        closeAboutModal.addEventListener('click', () => {
+            aboutModal.classList.add('invisible', 'opacity-0');
+            aboutModalContent.classList.add('-translate-y-4');
+        });
+        
+        // Close modal when clicking outside
+        aboutModal.addEventListener('click', (e) => {
+            if (e.target === aboutModal) {
+                aboutModal.classList.add('invisible', 'opacity-0');
+                aboutModalContent.classList.add('-translate-y-4');
+            }
+        });
+    </script>
+</body>
+</html>
